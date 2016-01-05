@@ -14,7 +14,7 @@
 
 #Check architecture
 if { [ "$1" != "arm" ] && [ "$1" != "arm64" ] && [ "$1" != "x86" ] && [ "$1" != "x86_64" ]; } || [ -z "$2" ]; then
-  echo "Usage: $0 (arm|arm64|x86|x86_64) API_LEVEL"
+  echo "Usage: $0 (arm|arm64|x86|x86_64) API_LEVEL [VARIANT]"
   exit 1
 fi
 
@@ -30,6 +30,9 @@ OUT="$TOP/out"
 SOURCES="$TOP/sources"
 SCRIPTS="$TOP/scripts"
 CERTIFICATES="$SCRIPTS/certificates"
+#CERTIFICATEFILE="" #this can be set to a filepath to use as certificate file for signing
+#KEYFILE="" #this can be set to a filepath to use as key file for signing
+#OPENGAPPSLICENSEFILE="" #this can be set to a filepath to include as a LICENSE file
 . "$SCRIPTS/inc.aromadata.sh"
 . "$SCRIPTS/inc.buildhelper.sh"
 . "$SCRIPTS/inc.buildtarget.sh"
@@ -74,9 +77,9 @@ fi;
 
 kitkatpathshack	#kitkat has different apk and lib paths which impact installer.data
 kitkatdatahack #kitkat installs some applications on /data/ instead of /system/
+keyboardlibhack #only 5.0+ has gestures for the aosp keyboard possible, which impact installer.data and an extra file in the package
 api21hack #only 5.0+ supports google tag
 api22hack #only 5.1+ supports google webview (Stock Google 5.0 ROMs too, but we merged stock and fornexus) and GCS
-keyboardlibhack #only 5.0+ has gestures for the aosp keyboard possible, which impact installer.data and an extra file in the package
 api23hack #only on 6.0+ we also include Google Contacts, Dialer, Calculator, Packageinstaller and Configupdater
 buildtarget
 alignbuild

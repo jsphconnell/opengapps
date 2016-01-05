@@ -61,10 +61,14 @@ $(foreach api,$(APIS),\
 $(eval $(call make-gapps,$(platform)-$(api)))\
 ))
 
+tidycache:
+	@find "$(CACHEDIR)/"* -atime +7 -exec rm {} \;
+	@echo "$(tput setaf 2)Cache cleaned, archives not used for 7 days removed!$(tput sgr 0)"
+
 clean:
-	@rm -fr $(BUILDDIR)
+	@rm -fr "$(BUILDDIR)"
 	@echo "$(tput setaf 2)Build directory removed!$(tput sgr 0)"
 
 distclean: clean
-	@rm -fr $(CACHEDIR)
+	@rm -fr "$(CACHEDIR)"
 	@echo "$(tput setaf 2)Cache directory removed!$(tput sgr 0)"

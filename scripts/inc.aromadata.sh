@@ -105,8 +105,12 @@ checkviewbox(
 if
     getvar("loadselections")=="1"
   then
-    resexec("scripts/tools.sh", "load");
-    setvar("reset", "1");
+    if
+        getvar("reset")!="1"
+    then
+        resexec("scripts/tools.sh", "load");
+        setvar("reset", "1");
+    endif;
   else
     if
       getvar("reset")=="1" then
@@ -132,18 +136,21 @@ form(
       "AndroidPay",     "<b>Android Pay</b>",       "",                      "check",
       "AndroidForWork",     "<b>Android For Work</b>",       "",                      "check",
       "Books",     "<b>Google Play Books</b>",       "",                      "check",
+      "CalculatorGoogle",     "<b>Google Calculator</b>",       "",                      "check",
       "CalendarGoogle",     "<b>Google Calendar</b>",       "",                      "check",
       "CalSync",     "<b>Google Calendar Sync</b>",       "(installed by default when Google Calendar is NOT being installed)",                      "check",
       "CameraGoogle",     "<b>Google Camera</b>",       "",                      "check",
       "Chrome",     "<b>Google Chrome</b>",       "",                      "check",
       "ClockGoogle",     "<b>Google Clock</b>",       "",                      "check",
       "CloudPrint",     "<b>Google Cloud Print</b>",       "",                      "check",
+      "ContactsGoogle",     "<b>Google Contacts</b>",       "",                      "check",
       "DMAgent",     "<b>Google Apps Device Policy</b>",       "",                      "check",
       "Docs",     "<b>Google Docs</b>",       "",                      "check",
       "Drive",     "<b>Google Drive</b>",       "",                      "check",
       "Ears",     "<b>Sound Search for Google Play</b>",       "",                      "check",
       "Earth",     "<b>Google Earth</b>",       "",                      "check",
       "ExchangeGoogle",     "<b>Google Exchange Services</b>",       "",                      "check",
+      "FaceDetect",     "<b>Face Detection for Media</b>",       "",                      "check",
       "FaceUnlock",     "<b>Face Unlock</b>",       "",                      "check",
       "Fitness",     "<b>Google Fit</b>",       "",                      "check",
       "GCS",     "<b>Google Connectivity Services</b>",       "To Exclude BOTH Google Connectivity Services AND Project Fi by Google <#f00>OR</#> To Include Google Connectivity Services",                      "check",
@@ -252,8 +259,7 @@ form(
     extra.prop,
     "extra",     "Advanced Options",        "",                                         "group",
       "ex1",     "<b>No Debug Log</b>",       "To disable debugging",                      "check",
-      "ex2",     "<b>Test</b>",       "To perform a simulation generating a detailed log, but <u>WILL NOT MAKE ANY CHANGES</u> to your device.",                      "check",
-      "ex3",     "<b>Swype Libs</b>",       "The AOSP keyboard does normally not support gesture typing but can be added on some ROMs by using Google's libs.",                      "check"
+      "ex2",     "<b>Test</b>",       "To perform a simulation generating a detailed log, but <u>WILL NOT MAKE ANY CHANGES</u> to your device.",                      "check"
 );
 
 ##############################################
@@ -271,11 +277,6 @@ if
   prop("extra.prop", "ex2")=="1"
 then
   appendvar("gapps", "Test\n");
-endif;
-if
-  prop("extra.prop", "ex3")=="1"
-then
-  appendvar("gapps", "swypelibs\n");
 endif;
 
 # INCLUDE/EXCLUDE
@@ -306,6 +307,12 @@ if
   prop("gapps.prop", "Books")=="1"
 then
   appendvar("gapps", "Books\n");
+endif;
+
+if
+  prop("gapps.prop", "CalculatorGoogle")=="1"
+then
+  appendvar("gapps", "CalculatorGoogle\n");
 endif;
 
 if
@@ -345,6 +352,12 @@ then
 endif;
 
 if
+  prop("gapps.prop", "ContactsGoogle")=="1"
+then
+  appendvar("gapps", "ContactsGoogle\n");
+endif;
+
+if
   prop("gapps.prop", "DMAgent")=="1"
 then
   appendvar("gapps", "DMAgent\n");
@@ -378,6 +391,12 @@ if
   prop("gapps.prop", "ExchangeGoogle")=="1"
 then
   appendvar("gapps", "ExchangeGoogle\n");
+endif;
+
+if
+  prop("gapps.prop", "FaceDetect")=="1"
+then
+  appendvar("gapps", "FaceDetect\n");
 endif;
 
 if

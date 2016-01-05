@@ -33,6 +33,14 @@ makegappsremovetxt(){
       gapps_remove="/system/$packagetarget$REMOVALSUFFIX
 $gapps_remove"
     fi
+    for lib in $packagelibs; do
+      systemlibpath=""
+      getpathsystemlib "$lib"
+      for libpath in $systemlibpath; do
+        gapps_remove="/system/$libpath
+$gapps_remove"
+      done
+    done
     for file in $packagefiles; do
       if [ "$file" = "etc" ];then
         gapps_remove="$(find "$SOURCES/all/" -mindepth 3 -printf "%P\n" -name "*" | grep "etc/" | sed 's#^#/system/#' | sort | uniq)
@@ -45,6 +53,10 @@ $gapps_remove"
 $gapps_remove"
       fi
     done
+    for extraline in $packagegappsremove; do
+      gapps_remove="/system/$extraline
+$gapps_remove"
+    done
   done
   printf "%s" "$gapps_remove" | sort > "$build/gapps-remove.txt"
   EXTRACTFILES="$EXTRACTFILES gapps-remove.txt"
@@ -55,7 +67,7 @@ makeinstallerdata(){
 #    The Open GApps scripts are free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
 #    the Free Software Foundation, either version 3 of the License, or
-#    (at your option) any later version.
+#    (at your option) any later version, w/Open GApps installable zip exception.
 #
 #    These scripts are distributed in the hope that it will be useful,
 #    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -182,6 +194,7 @@ vendor/bundled-app/Boxer'"$REMOVALSUFFIX"'
 browser_list="
 app/Browser'"$REMOVALSUFFIX"'
 app/BrowserProviderProxy'"$REMOVALSUFFIX"'
+app/Chromium'"$REMOVALSUFFIX"'
 ";
 
 basicdreams_list="
@@ -390,9 +403,7 @@ app/VisualizationWallpapers'"$REMOVALSUFFIX"'
 webviewstock_list="
 app/webview'"$REMOVALSUFFIX"'
 app/WebView'"$REMOVALSUFFIX"'
-lib/$WebView_lib_filename
-lib64/$WebView_lib_filename
-";
+'"$webviewstocklibs"'";
 
 whisperpush_list="
 app/WhisperPush'"$REMOVALSUFFIX"'
@@ -502,6 +513,13 @@ del_conflict_msg="!!! WARNING !!! - Duplicate files were found between your ROM 
 no_tar_message="INSTALLATION FAILURE: The installer detected that your recovery does not support\ntar extraction. Please update your recovery or switch to another one like TWRP."
 no_xz_message="INSTALLATION FAILURE: The installer detected that your recovery does not support\nXZ decompression. Please update your recovery or switch to another one like TWRP."
 no_stdin_message="INSTALLATION FAILURE: The installer detected that your recovery\ndoes not support stdin for the tar binary. Please update your recovery\nor switch to another one like TWRP."
+
+nogooglecontacts_removal_msg="NOTE: The Stock/AOSP Contacts is not available on your\nROM (anymore), the Google equivalent will not be removed."
+#nogoogledialer_removal_msg="NOTE: The Stock/AOSP Dialer is not available on your\nROM (anymore), the Google equivalent will not be removed."
+nogooglekeyboard_removal_msg="NOTE: The Stock/AOSP Keyboard is not available on your\nROM (anymore), the Google equivalent will not be removed."
+nogooglepackageinstaller_removal_msg="NOTE: The Stock/AOSP Package Installer is not\navailable on your ROM (anymore), the Google equivalent will not be removed."
+nogoogletag_removal_msg="NOTE: The Stock/AOSP NFC Tag is not available on your\nROM (anymore), the Google equivalent will not be removed."
+nogooglewebview_removal_msg="NOTE: The Stock/AOSP WebView is not available on your\nROM (anymore), the Google equivalent will not be removed."
 EOFILE
   EXTRACTFILES="$EXTRACTFILES installer.data"
 }

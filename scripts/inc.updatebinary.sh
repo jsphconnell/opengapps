@@ -1,12 +1,12 @@
 makeupdatebinary(){
 get_fallback_arch "$ARCH" #make sure that $fallback_arch will be available
-echo '#!/sbin/ash
+echo '#!/sbin/sh
 #This file is part of The Open GApps script of @mfonville.
 #
 #    The Open GApps scripts are free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
 #    the Free Software Foundation, either version 3 of the License, or
-#    (at your option) any later version.
+#    (at your option) any later version, w/Open GApps installable zip exception.
 #
 #    These scripts are distributed in the hope that it will be useful,
 #    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -611,19 +611,10 @@ else
   forceclean="false"
 fi;
 
-# Check for swypelibs in gapps-config or if current aosp lib is already a symlink (which indicates to an already replaced lib)
-EOFILE
-echo 'if ( grep -qiE "^swypelibs$" $g_conf ) || [ -h "/system/'"$LIBFOLDER"'/$keybd_lib_aosp" ] ; then # true or false to override the default selection'>> "$build/META-INF/com/google/android/update-binary"
-tee -a "$build/META-INF/com/google/android/update-binary" > /dev/null <<'EOFILE'
-  swypelibs="true"
-else
-  swypelibs="false"
-fi;
-
 # Set density to unknown if it's still empty
 test -z "$density" && density=unknown;
 
-# Remove any files from gapps-list.txt that should not be processed for automatic removal
+# Remove any files from gapps-remove.txt that should not be processed for automatic removal
 for bypass_file in $removal_bypass_list; do
   sed -i "\:${bypass_file}:d" $gapps_removal_list;
 done;
@@ -729,7 +720,7 @@ else
 
   # Use the opportunity of No GApps installed to check for potential ROM conflicts when deleting existing GApps files
   while read gapps_file; do
-    if [ -e "$gapps_file" ]; then
+    if [ -e "$gapps_file" ] && [ "$gapps_file" != "/system/lib/$WebView_lib_filename" ] && [ "$gapps_file" != "/system/lib64/$WebView_lib_filename" ]; then
       echo "$gapps_file" >> $conflicts_log;
     fi;
   done < $gapps_removal_list;
@@ -958,8 +949,8 @@ if ( contains "$gapps_list" "dialergoogle" ) && ( ! contains "$aosp_remove_list"
   aosp_remove_list="${aosp_remove_list}dialerstock"$'\n';
 fi;
 
-# If we're installing packageinstaller we MUST ADD packageinstallerstock to $aosp_remove_list (if it's not already there)
-if ( contains "$core_gapps_list" "packageinstaller" ) && ( ! contains "$aosp_remove_list" "packageinstallerstock" ); then
+# If we're installing packageinstallergoogle we MUST ADD packageinstallerstock to $aosp_remove_list (if it's not already there)
+if ( contains "$core_gapps_list" "packageinstallergoogle" ) && ( ! contains "$aosp_remove_list" "packageinstallerstock" ); then
   aosp_remove_list="${aosp_remove_list}packageinstallerstock"$'\n';
 fi;
 
@@ -968,6 +959,119 @@ if ( ! contains "$gapps_list" "gcs" ) && ( contains "$gapps_list" "projectfi" );
   gapps_list=${gapps_list/projectfi};
   install_note="${install_note}projectfi_msg"$'\n'; # make note that Project Fi will NOT be installed as user requested
 fi;
+
+# Some ROMs bundle Google Apps or the user might have installed a Google replacement app during an earlier install
+# Some of these apps are crucial to a functioning system and should NOT be removed if no AOSP/Stock equivalent is available
+# Unless override keyword is used, make sure they are not removed
+# NOTICE: Only for Google Keyboard we need to take KitKat support into account, others are only Lollipop+
+ignoregooglecontacts="true"
+for f in $contactsstock_list; do
+  if [ -e "$f" ]; then
+    ignoregooglecontacts="false"
+    break; #at least 1 aosp stock file is present
+  fi
+done;
+if [ "$ignoregooglecontacts" = "true" ]; then
+  if ( ! contains "$gapps_list" "contactsgoogle" ) && ( ! grep -qi "override" "$g_conf" ); then
+    sed -i "\:/system/priv-app/GoogleContacts:d" $gapps_removal_list;
+    ignoregooglecontacts="true[NoRemove]"
+    install_note="${install_note}nogooglecontacts_removal"$'\n'; # make note that Google Contacts will not be removed
+  else
+    ignoregooglecontacts="false[ContactsGoogle]"
+  fi
+fi
+
+#ignoregoogledialer="true"
+#for f in $dialerstock_list; do
+#  if [ -e "$f" ]; then
+#    ignoregoogledialer="false"
+#    break; #at least 1 aosp stock file is present
+#  fi
+#done;
+#if [ "$ignoregoogledialer" = "true" ]; then
+#  if ( ! contains "$gapps_list" "dialergoogle" ) && ( ! grep -qi "override" "$g_conf" ); then
+#    sed -i "\:/system/priv-app/GoogleDialer:d" $gapps_removal_list;
+#    ignoregoogledialer="true[NoRemove]"
+#    install_note="${install_note}nogoogledialer_removal"$'\n'; # make note that Google Dialer will not be removed
+#  else
+#    ignoregoogledialer="false[DialerGoogle]"
+#  fi
+#fi
+
+ignoregooglekeyboard="true"
+for f in $keyboardstock_list; do
+  if [ -e "$f" ]; then
+    ignoregooglekeyboard="false"
+    break; #at least 1 aosp stock file is present
+  fi
+done;
+if [ "$ignoregooglekeyboard" = "true" ]; then
+  if ( ! contains "$gapps_list" "keyboardgoogle" ) && ( ! grep -qi "override" "$g_conf" ); then
+EOFILE
+keyboardgooglenotremovehack
+tee -a "$build/META-INF/com/google/android/update-binary" > /dev/null <<'EOFILE'
+    ignoregooglekeyboard="true[NoRemove]"
+    install_note="${install_note}nogooglekeyboard_removal"$'\n'; # make note that Google Keyboard will not be removed
+  else
+    ignoregooglekeyboard="false[KeyboardGoogle]"
+  fi
+fi
+
+ignoregooglepackageinstaller="true"
+for f in $packageinstallerstock_list; do
+  if [ -e "$f" ]; then
+    ignoregooglepackageinstaller="false"
+    break; #at least 1 aosp stock file is present
+  fi
+done;
+if [ "$ignoregooglepackageinstaller" = "true" ]; then
+  if ( ! contains "$gapps_list" "packageinstallergoogle" ) && ( ! grep -qi "override" "$g_conf" ); then
+    sed -i "\:/system/priv-app/GooglePackageInstaller:d" $gapps_removal_list;
+    ignoregooglepackageinstaller="true[NoRemove]"
+    install_note="${install_note}nogooglepackageinstaller_removal"$'\n'; # make note that Google Package Installer will not be removed
+  else
+    ignoregooglepackageinstaller="false[PackageInstallerGoogle]"
+  fi
+fi
+
+ignoregoogletag="true"
+for f in $tagstock_list; do
+  if [ -e "$f" ]; then
+    ignoregoogletag="false"
+    break; #at least 1 aosp stock file is present
+  fi
+done;
+if [ "$ignoregoogletag" = "true" ]; then
+  if ( ! contains "$gapps_list" "taggoogle" ) && ( ! grep -qi "override" "$g_conf" ); then
+    sed -i "\:/system/priv-app/TagGoogle:d" $gapps_removal_list;
+    ignoregoogletag="true[NoRemove]"
+    install_note="${install_note}nogoogletag_removal"$'\n'; # make note that Google Tag will not be removed
+  else
+    ignoregoogletag="false[TagGoogle]"
+  fi
+fi
+
+ignoregooglewebview="true"
+for f in $webviewstock_list; do
+  if [ -e "$f" ]; then
+    ignoregooglewebview="false"
+    break; #at least 1 aosp stock file is present
+  fi
+done;
+if [ "$ignoregooglewebview" = "true" ]; then #No AOSP WebView
+  if ( ! contains "$gapps_list" "webviewgoogle" ) && ( ! grep -qi "override" "$g_conf" ); then #Don't remove Google WebView components if no Google WebView selected
+    sed -i "\:/system/lib/$WebView_lib_filename:d" $gapps_removal_list;
+    sed -i "\:/system/lib64/$WebView_lib_filename:d" $gapps_removal_list;
+    sed -i "\:/system/app/WebViewGoogle:d" $gapps_removal_list;
+    ignoregooglewebview="true[NoRemove]"
+    install_note="${install_note}nogooglewebview_removal"$'\n'; # make note that Google WebView will not be removed
+  else #No AOSP WebView, but Google WebView is being installed, no reason to protect the current components
+    ignoregooglewebview="false[WebViewGoogle]"
+  fi
+elif ( ! contains "$gapps_list" "webviewgoogle" ); then #AOSP WebView, and no Google WebView being installed, make sure to protect the current AOSP components that share name with Google WebView components
+  sed -i "\:/system/lib/$WebView_lib_filename:d" $gapps_removal_list;
+  sed -i "\:/system/lib64/$WebView_lib_filename:d" $gapps_removal_list;
+fi
 
 # Process User Application Removals for calculations and subsequent removal
 if [ -n "$user_remove_list" ]; then
@@ -1003,6 +1107,7 @@ obsolete_libs_list="";
 for f in $(find /system/lib /system/lib64 -name 'libchrome*.so' 2>/dev/null); do
   obsolete_libs_list="${obsolete_libs_list}$f"$'\n';
 done;
+
 # Read in gapps removal list from file and append old Chrome libs
 full_removal_list="$(cat $gapps_removal_list)"$'\n'"${obsolete_libs_list}";
 
@@ -1027,6 +1132,12 @@ log "Remove Stock/AOSP MMS App" "$remove_mms";
 log "Remove Stock/AOSP Pico TTS" "$remove_picotts";
 log "Remove Stock/AOSP NFC Tag" "$remove_tagstock";
 log "Remove Stock/AOSP WebView" "$remove_webviewstock";
+log "Ignore Google Contacts" "$ignoregooglecontacts";
+#log "Ignore Google Dialer" "$ignoregoogledialer";
+log "Ignore Google Keyboard" "$ignoregooglekeyboard";
+log "Ignore Google Package Installer" "$ignoregooglepackageinstaller";
+log "Ignore Google NFC Tag" "$ignoregoogletag";
+log "Ignore Google WebView" "$ignoregooglewebview";
 # _____________________________________________________________________________________________________________________
 #                                                  Perform space calculations
 ui_print "- Performing system space calculations";
@@ -1039,18 +1150,12 @@ for gapp_name in $core_gapps_list; do
   core_size=$((core_size + appsize));
 done;
 
-# Add swypelibs size to core, if it exists
-if [ $swypelibs = "true" ]; then
+# Add swypelibs size to core, if it will be installed
+if ( ! contains "$gapps_list" "keyboardgoogle" ); then
   unzip -o "$ZIP" "Optional/swypelibs.tar.xz" -d /tmp;
   keybd_lib_size=$(tar -tvJf "/tmp/Optional/swypelibs.tar.xz" "swypelibs" 2>/dev/null | awk 'BEGIN { app_size=0; } { file_size=$3; app_size=app_size+file_size; } END { printf "%.0f\n", app_size / 1024; }');
   rm -f "/tmp/Optional/swypelibs.tar.xz";
   core_size=$((core_size + keybd_lib_size)); # Add Keyboard Lib size to core, if it exists
-fi
-
-# Do not touch AOSP keyboard if the swypelibs are not replaced
-if [ $swypelibs = "false" ]; then
-  reqd_list=$(echo "${reqd_list}" | grep -v "latinime.so");
-  remove_list=$(echo "${remove_list}" | grep -v "latinime.so");
 fi
 
 # Read and save system partition size details
@@ -1233,28 +1338,30 @@ EOFILE
 echo '# Create FaceLock lib symlink if FaceLock was installed
 if ( contains "$gapps_list" "faceunlock" ); then
   mkdir -p "/system/app/FaceLock/lib/'"$ARCH"'";
-  ln -sf "/system/'"$LIBFOLDER"'/$faceLock_lib_filename" "/system/app/FaceLock/lib/'"$ARCH"'/$faceLock_lib_filename"; # create required symlink
+  ln -sfn "/system/'"$LIBFOLDER"'/$faceLock_lib_filename" "/system/app/FaceLock/lib/'"$ARCH"'/$faceLock_lib_filename"; # create required symlink
   # Add same code to backup script to insure symlinks are recreated on addon.d restore
-  sed -i "\:# Recreate required symlinks (from GApps Installer):a \    ln -sf \"/system/'"$LIBFOLDER"'/$faceLock_lib_filename\" \"/system/app/FaceLock/lib/'"$ARCH"'/$faceLock_lib_filename\"" $bkup_tail;
+  sed -i "\:# Recreate required symlinks (from GApps Installer):a \    ln -sfn \"/system/'"$LIBFOLDER"'/$faceLock_lib_filename\" \"/system/app/FaceLock/lib/'"$ARCH"'/$faceLock_lib_filename\"" $bkup_tail;
   sed -i "\:# Recreate required symlinks (from GApps Installer):a \    mkdir -p \"/system/app/FaceLock/lib/'"$ARCH"'\"" $bkup_tail;
 fi;
-
-# Create WebView lib symlink if WebView was installed
+' >> "$build/META-INF/com/google/android/update-binary"
+if [ "$API" -lt "23" ]; then
+  echo '# Create WebView lib symlink if WebView was installed
 if ( contains "$gapps_list" "webviewgoogle" ); then
   mkdir -p "/system/app/WebViewGoogle/lib/'"$ARCH"'";
-  ln -sf "/system/'"$LIBFOLDER"'/$WebView_lib_filename" "/system/app/WebViewGoogle/lib/'"$ARCH"'/$WebView_lib_filename"; # create required symlink' >> "$build/META-INF/com/google/android/update-binary"
-if [ "$LIBFOLDER" = "lib64" ]; then #on 64bit we also need to add 32 bit libs
-  echo '  mkdir -p "/system/app/WebViewGoogle/lib/'"$fallback_arch"'";
-  ln -sf "/system/lib/$WebView_lib_filename" "/system/app/WebViewGoogle/lib/'"$fallback_arch"'/$WebView_lib_filename"; # create required symlink' >> "$build/META-INF/com/google/android/update-binary"
-fi
-echo '  # Add same code to backup script to insure symlinks are recreated on addon.d restore' >> "$build/META-INF/com/google/android/update-binary"
-if [ "$LIBFOLDER" = "lib64" ]; then #on 64bit we also need to add 32 bit libs
-  echo '  sed -i "\:# Recreate required symlinks (from GApps Installer):a \    ln -sf \"/system/lib/$WebView_lib_filename\" \"/system/app/WebViewGoogle/lib/'"$fallback_arch"'/$WebView_lib_filename\"" $bkup_tail;
+  ln -sfn "/system/'"$LIBFOLDER"'/$WebView_lib_filename" "/system/app/WebViewGoogle/lib/'"$ARCH"'/$WebView_lib_filename"; # create required symlink' >> "$build/META-INF/com/google/android/update-binary"
+  if [ "$LIBFOLDER" = "lib64" ]; then #on 64bit we also need to add 32 bit libs
+    echo '  mkdir -p "/system/app/WebViewGoogle/lib/'"$fallback_arch"'";
+  ln -sfn "/system/lib/$WebView_lib_filename" "/system/app/WebViewGoogle/lib/'"$fallback_arch"'/$WebView_lib_filename"; # create required symlink' >> "$build/META-INF/com/google/android/update-binary"
+  fi
+  echo '  # Add same code to backup script to insure symlinks are recreated on addon.d restore' >> "$build/META-INF/com/google/android/update-binary"
+  if [ "$LIBFOLDER" = "lib64" ]; then #on 64bit we also need to add 32 bit libs
+    echo '  sed -i "\:# Recreate required symlinks (from GApps Installer):a \    ln -sfn \"/system/lib/$WebView_lib_filename\" \"/system/app/WebViewGoogle/lib/'"$fallback_arch"'/$WebView_lib_filename\"" $bkup_tail;
   sed -i "\:# Recreate required symlinks (from GApps Installer):a \    mkdir -p \"/system/app/WebViewGoogle/lib/'"$fallback_arch"'\"" $bkup_tail;' >> "$build/META-INF/com/google/android/update-binary"
-fi
-echo '  sed -i "\:# Recreate required symlinks (from GApps Installer):a \    ln -sf \"/system/'"$LIBFOLDER"'/$WebView_lib_filename\" \"/system/app/WebViewGoogle/lib/'"$ARCH"'/$WebView_lib_filename\"" $bkup_tail;
+  fi
+  echo '  sed -i "\:# Recreate required symlinks (from GApps Installer):a \    ln -sfn \"/system/'"$LIBFOLDER"'/$WebView_lib_filename\" \"/system/app/WebViewGoogle/lib/'"$ARCH"'/$WebView_lib_filename\"" $bkup_tail;
   sed -i "\:# Recreate required symlinks (from GApps Installer):a \    mkdir -p \"/system/app/WebViewGoogle/lib/'"$ARCH"'\"" $bkup_tail;
 fi;' >> "$build/META-INF/com/google/android/update-binary"
+fi
 tee -a "$build/META-INF/com/google/android/update-binary" > /dev/null <<'EOFILE'
 
 # Copy g.prop over to /system/etc

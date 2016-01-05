@@ -17,36 +17,50 @@ cameracompatibilityhack(){
   fi
 }
 
-keyboardlibhack(){ #only on lollipop arm and arm64
-  if [ "$API" -gt "19" ] && [ "$API" -lt "23" ] && { [ "$ARCH" = "arm" ] || [ "$ARCH" = "arm64" ];}; then
-    gappsoptional="swypelibs $gappsoptional"
-    REQDLIST="/system/lib/libjni_latinime.so
-/system/lib/libjni_latinimegoogle.so
-/system/lib64/libjni_latinime.so
-/system/lib64/libjni_latinimegoogle.so
-/system/app/LatinIME/lib/$ARCH/libjni_latinime.so
-/system/app/LatinIME/lib/$ARCH/libjni_latinimegoogle.so"
-    KEYBDLIBS='keybd_lib_google="libjni_latinimegoogle.so";
-keybd_lib_aosp="libjni_latinime.so";'
-    # Do not touch AOSP keyboard only if swypelibs should be installed
-    KEYBDINSTALLCODE='if [ $swypelibs = "true" ]; then
-    extract_app "Optional/swypelibs";
-    ln -sf "/system/'"$LIBFOLDER"'/$keybd_lib_google" "/system/'"$LIBFOLDER"'/$keybd_lib_aosp"; # create required symlink
-    mkdir -p "/system/app/LatinIME/lib/'"$ARCH"'";
-    ln -sf "/system/'"$LIBFOLDER"'/$keybd_lib_google" "/system/app/LatinIME/lib/'"$ARCH"'/$keybd_lib_google"; # create required symlink
-    ln -sf "/system/'"$LIBFOLDER"'/$keybd_lib_google" "/system/app/LatinIME/lib/'"$ARCH"'/$keybd_lib_aosp"; # create required symlink
-
-    # Add same code to backup script to insure symlinks are recreated on addon.d restore
-    sed -i "\:# Recreate required symlinks (from GApps Installer):a \    ln -sf \"/system/'"$LIBFOLDER"'/$keybd_lib_google\" \"/system/app/LatinIME/lib/'"$ARCH"'/$keybd_lib_aosp\"" $bkup_tail;
-    sed -i "\:# Recreate required symlinks (from GApps Installer):a \    ln -sf \"/system/'"$LIBFOLDER"'/$keybd_lib_google\" \"/system/app/LatinIME/lib/'"$ARCH"'/$keybd_lib_google\"" $bkup_tail;
-    sed -i "\:# Recreate required symlinks (from GApps Installer):a \    mkdir -p \"/system/app/LatinIME/lib/'"$ARCH"'\"" $bkup_tail;
-    sed -i "\:# Recreate required symlinks (from GApps Installer):a \    ln -sf \"/system/'"$LIBFOLDER"'/$keybd_lib_google\" \"/system/'"$LIBFOLDER"'/$keybd_lib_aosp\"" $bkup_tail;
-fi;'
+keyboardgooglenotremovehack(){
+  if [ "$API" -le "19" ]; then
+    echo '  sed -i "\:/system/app/LatinImeGoogle.apk:d" $gapps_removal_list;'>> "$build/META-INF/com/google/android/update-binary"
   else
-    REQDLIST=""
-    KEYBDLIBS=""
-    KEYBDINSTALLCODE=""
+    echo '  sed -i "\:/system/app/LatinImeGoogle:d" $gapps_removal_list;'>> "$build/META-INF/com/google/android/update-binary"
   fi
+}
+
+keyboardlibhack(){
+  case "$ARCH" in #only arm based platforms we have swypelibs
+    arm*) gappsoptional="swypelibs $gappsoptional"
+          if [ "$API" -gt "19" ]; then # on Lollipop there are symlinks in /LatinIME/lib/ and we don't need to remove the aosp lib
+            REQDLIST="/system/lib/libjni_latinimegoogle.so
+/system/lib64/libjni_latinimegoogle.so
+/system/app/LatinIME/lib/$ARCH/libjni_latinimegoogle.so"
+            KEYBDLIBS='keybd_lib_google="libjni_latinimegoogle.so";'
+            # Only touch AOSP keyboard only if it is not removed
+            KEYBDINSTALLCODE='if ( ! contains "$gapps_list" "keyboardgoogle" ); then
+  extract_app "Optional/swypelibs";
+  mkdir -p "/system/app/LatinIME/lib/'"$ARCH"'";
+  ln -sfn "/system/'"$LIBFOLDER"'/$keybd_lib_google" "/system/app/LatinIME/lib/'"$ARCH"'/$keybd_lib_google"; # create required symlink
+
+  # Add same code to backup script to insure symlinks are recreated on addon.d restore
+  sed -i "\:# Recreate required symlinks (from GApps Installer):a \    ln -sfn \"/system/'"$LIBFOLDER"'/$keybd_lib_google\" \"/system/app/LatinIME/lib/'"$ARCH"'/$keybd_lib_google\"" $bkup_tail;
+  sed -i "\:# Recreate required symlinks (from GApps Installer):a \    mkdir -p \"/system/app/LatinIME/lib/'"$ARCH"'\"" $bkup_tail;
+fi;'
+          else # on KitKat we need to replace the aosp lib with a symlink, it has no 64bit libs
+            REQDLIST="/system/lib/libjni_latinime.so
+/system/lib/libjni_latinimegoogle.so"
+            KEYBDLIBS='keybd_lib_google="libjni_latinimegoogle.so";
+keybd_lib_aosp="libjni_latinime.so";'
+      # Only touch AOSP keyboard only if it is not removed
+            KEYBDINSTALLCODE='if ( ! contains "$gapps_list" "keyboardgoogle" ); then
+  extract_app "Optional/swypelibs";
+  ln -sfn "/system/'"$LIBFOLDER"'/$keybd_lib_google" "/system/'"$LIBFOLDER"'/$keybd_lib_aosp"; # create required symlink
+
+  # Add same code to backup script to insure symlinks are recreated on addon.d restore
+  sed -i "\:# Recreate required symlinks (from GApps Installer):a \    ln -sfn \"/system/'"$LIBFOLDER"'/$keybd_lib_google\" \"/system/'"$LIBFOLDER"'/$keybd_lib_aosp\"" $bkup_tail;
+fi;'
+          fi;;
+    *) REQDLIST=""
+       KEYBDLIBS=""
+       KEYBDINSTALLCODE="";;
+  esac
 }
 
 kitkatdatahack(){
@@ -194,19 +208,17 @@ api22hack(){
 configupdater"
 
     # On AOSP we only support Webview on 5.1+, stock Google ROMs support it on 5.0 too, but we're merging stock and fornexus
-    case "$VARIANT" in # We prevent the removal of WebViewGoogle on packages smaller than stock
-      aroma|super|stock)  gappsstock="$gappsstock
-webviewgoogle";
-                          stockremove="$stockremove
-webviewstock";;
-    esac
+    gappsstock="$gappsstock
+webviewgoogle"
+    stockremove="$stockremove
+webviewstock"
   fi
 }
 
 api23hack(){
   if [ "$API" -ge "23" ]; then
     gappscore="$gappscore
-packageinstaller"
+packageinstallergoogle"
     gappspico="$gappspico
 googletts"
     gappsmini="$gappsmini
@@ -214,8 +226,15 @@ calculatorgoogle"
     gappsstock="$gappsstock
 contactsgoogle"
 #dialergoogle"
+    webviewstocklibs='lib/$WebView_lib_filename
+lib64/$WebView_lib_filename
+' #on Marshmallow the AOSP WebViewlibs must be removed, since they are embedded in the Google WebView APK; this assumes also any pre-bundled Google WebView with the ROM uses embedded libs; use single quote to not replace variable names
+    webviewgappsremove=""
   else
     gappsmicro="$gappsmicro
 googletts"
+    webviewstocklibs="" # on non-Marshmallow the WebViewlibs should not be considered part of the Stock/AOSP WebView, since they are shared with the Google WebView
+    webviewgappsremove="lib/libwebviewchromium.so
+lib64/libwebviewchromium.so" #on non-Marshmallow the WebViewlibs are to be explictly included as a Google WebView file in gapps-remove.txt
   fi
 }

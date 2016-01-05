@@ -34,23 +34,23 @@ buildfile() {
   if [ -z "$3" ]; then usearch="$ARCH"
   else usearch="$3"; fi #allows for an override
 
-  if [ -e "$SOURCES/$usearch/$2" ]; then #check if directory or file exists
-    if [ -d "$SOURCES/$usearch/$2" ]; then #if we are handling a directory
-      targetdir="$build/$1/$2"
+  if [ -e "$SOURCES/$usearch/$1" ]; then #check if directory or file exists
+    if [ -d "$SOURCES/$usearch/$1" ]; then #if we are handling a directory
+      targetdir="$build/$2/$1"
     else
-      targetdir="$build/$1/$(dirname "$2")"
+      targetdir="$build/$2/$(dirname "$1")"
     fi
     if [ "$usearch" != "$ARCH" ]; then
-      echo "INFO: Falling back from $ARCH to $usearch for file $2"
+      echo "INFO: Falling back from $ARCH to $usearch for file $1"
     fi
     install -d "$targetdir"
-    copy "$SOURCES/$usearch/$2" "$targetdir" #if we have a file specific to this architecture
+    copy "$SOURCES/$usearch/$1" "$targetdir" #if we have a file specific to this architecture
   else
     get_fallback_arch "$usearch"
     if [ "$usearch" != "$fallback_arch" ]; then
       buildfile "$1" "$2" "$fallback_arch"
     else
-      echo "ERROR: No fallback available. Failed to build file $2"
+      echo "ERROR: No fallback available. Failed to build file $1"
       exit 1
     fi
   fi
@@ -62,10 +62,19 @@ buildsystemlib() {
   if [ -z "$3" ]; then usearch="$ARCH"
   else usearch="$3"; fi #allows for an override
 
+  fallback=""
+  case "$libname" in
+    *+fallback) libname="$(echo "$libname" | sed 's/+fallback//')"
+    fallback="true";;
+  esac
+
   if getsystemlibforapi "$libname" "$usearch" "$API"; then
     printf "%44s %6s-%s\n" "$libname" "$usearch" "$api"
-    install -D -p "$sourcelib" "$build/$targetlib"
+    install -D -p "$sourcelib" "$build/$liblocation/$targetlib"
   else
+    fallback="true"
+  fi
+  if [ -n "$fallback" ]; then
     get_fallback_arch "$usearch"
     if [ "$usearch" != "$fallback_arch" ]; then
       buildsystemlib "$libname" "$liblocation" "$fallback_arch"
@@ -76,7 +85,32 @@ buildsystemlib() {
   fi
 }
 
-buildapp(){
+getpathsystemlib(){
+  libname="$1"
+  if [ -z "$2" ]; then usearch="$ARCH"
+  else usearch="$2"; fi #allows for an override
+
+  fallback=""
+  case "$libname" in
+    *+fallback) libname="$(echo "$libname" | sed 's/+fallback//')"
+    fallback="true";;
+  esac
+
+  if getsystemlibforapi "$libname" "$usearch" "$API"; then
+    systemlibpath="$targetlib $systemlibpath"
+  else
+    fallback="true"
+  fi
+
+  if [ -n "$fallback" ]; then
+    get_fallback_arch "$usearch"
+    if [ "$usearch" != "$fallback_arch" ]; then
+      getpathsystemlib "$libname" "$fallback_arch"
+    fi
+  fi
+}
+
+buildapp() {
   package="$1"
   ziplocation="$2"
   targetlocation="$3"
@@ -154,6 +188,7 @@ getapksforapi() {
           maxsdkerrorapi="$api"
           continue 2
         fi
+        break
       done
       break
     fi

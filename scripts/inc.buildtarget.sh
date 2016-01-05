@@ -143,7 +143,10 @@ for app in $gapps; do
     buildapp "$packagename" "$packagetype/$app" "$packagetarget"
   fi
   for file in $packagefiles; do
-    buildfile "$packagetype/$app/common" "$file"
+    buildfile "$file" "$packagetype/$app/common"
+  done
+  for lib in $packagelibs; do
+    buildsystemlib "$lib" "$packagetype/$app/common"
   done
 done
 
@@ -155,6 +158,8 @@ get_package_info(){
   packagetype=""
   packagetarget=""
   packagefiles=""
+  packagelibs=""
+  packagegappsremove=""
   case "$1" in
     configupdater)            packagetype="Core"; packagename="com.google.android.configupdater"; packagetarget="priv-app/ConfigUpdater";;
     framework)                packagetype="Core"; packagefiles="etc framework";;
@@ -166,7 +171,7 @@ get_package_info(){
     gsflogin)                 packagetype="Core"; packagename="com.google.android.gsf.login"; packagetarget="priv-app/GoogleLoginService";;
     googleonetimeinitializer) packagetype="Core"; packagename="com.google.android.onetimeinitializer"; packagetarget="priv-app/GoogleOneTimeInitializer";;
     googlepartnersetup)       packagetype="Core"; packagename="com.google.android.partnersetup"; packagetarget="priv-app/GooglePartnerSetup";;
-    packageinstaller)         packagetype="Core"; packagename="com.google.android.packageinstaller"; packagetarget="priv-app/GooglePackageInstaller";;
+    packageinstallergoogle)   packagetype="Core"; packagename="com.google.android.packageinstaller"; packagetarget="priv-app/GooglePackageInstaller";;
     setupwizard)              packagetype="Core"; packagename="com.google.android.setupwizard"; packagetarget="priv-app/SetupWizard";;
     vending)                  packagetype="Core"; packagename="com.android.vending"; packagetarget="priv-app/Phonesky";;
 
@@ -183,17 +188,21 @@ get_package_info(){
     drive)          packagetype="GApps"; packagename="com.google.android.apps.docs"; packagetarget="app/Drive";;
     ears)           packagetype="GApps"; packagename="com.google.android.ears"; packagetarget="app/GoogleEars";;
     exchangegoogle) packagetype="GApps"; packagename="com.google.android.gm.exchange"; packagetarget="app/PrebuiltExchange3Google";;
-    facedetect)     packagetype="GApps"; packagefiles="$LIBFOLDER/libfilterpack_facedetect.so";
-                    if [ "$LIBFOLDER" = "lib64" ]; then #on 64 bit, we also need the 32 bit lib
-                      packagefiles="$packagefiles lib/libfilterpack_facedetect.so";
+    facedetect)     packagetype="GApps";
+                    if [ "$LIBFOLDER" = "lib64" ]; then #on 64 bit, we also need the 32 bit lib of libfilterpack_facedetect.so
+                      packagelibs="libfilterpack_facedetect.so+fallback";
+                    else
+                      packagelibs="libfilterpack_facedetect.so";
                     fi;;
-    faceunlock)     if [ "$ARCH" = "arm" ] || [ "$ARCH" = "arm64" ]; then #both arm and arm64
-                      packagetype="GApps"; packagename="com.android.facelock"; packagetarget="app/FaceLock";
-                      packagetype="GApps"; packagefiles="vendor/pittpatt/ $LIBFOLDER/libfacelock_jni.so vendor/$LIBFOLDER/libfrsdk.so";
-                      if [ "$LIBFOLDER" = "lib64" ]; then #on 64 bit, we also need the 32 bit lib
-                        packagefiles="$packagefiles vendor/lib/libfrsdk.so";
-                      fi;
-                    fi;;
+    faceunlock)     case "$ARCH" in #only arm based platforms
+                      arm*) packagetype="GApps"; packagename="com.android.facelock"; packagetarget="app/FaceLock";
+                            packagefiles="vendor/pittpatt/";
+                            if [ "$LIBFOLDER" = "lib64" ]; then #on 64 bit, we also need the 32 bit lib of librsdk.so
+                              packagelibs="libfacelock_jni.so libfrsdk.so+fallback";
+                            else
+                              packagelibs="libfacelock_jni.so libfrsdk.so";
+                            fi;;
+                    esac;;
     fitness)        packagetype="GApps"; packagename="com.google.android.apps.fitness"; packagetarget="app/FitnessPrebuilt";;
     gmail)          packagetype="GApps"; packagename="com.google.android.gm"; packagetarget="app/PrebuiltGmail";;
     googlenow)      packagetype="GApps"; packagename="com.google.android.launcher"; packagetarget="app/GoogleHome";;
@@ -216,7 +225,7 @@ get_package_info(){
     speech)         packagetype="GApps"; packagefiles="usr/srec/en-US/";;
     talkback)       packagetype="GApps"; packagename="com.google.android.marvin.talkback"; packagetarget="app/talkback";;
     taggoogle)      packagetype="GApps"; packagename="com.google.android.tag"; packagetarget="priv-app/TagGoogle";;
-    webviewgoogle)  packagetype="GApps"; packagename="com.google.android.webview"; packagetarget="app/WebViewGoogle";;
+    webviewgoogle)  packagetype="GApps"; packagename="com.google.android.webview"; packagetarget="app/WebViewGoogle"; packagegappsremove="$webviewgappsremove";;
     youtube)        packagetype="GApps"; packagename="com.google.android.youtube"; packagetarget="app/YouTube";;
 
     androidforwork) packagetype="GApps"; packagename="com.google.android.androidforwork"; packagetarget="priv-app/AndroidForWork";;
@@ -235,7 +244,7 @@ get_package_info(){
 
     dialergoogle)   packagetype="GApps"; packagename="com.google.android.dialer"; packagetarget="priv-app/GoogleDialer";;
 
-    swypelibs)      packagetype="Optional"; packagefiles="$LIBFOLDER/libjni_latinimegoogle.so";;
+    swypelibs)      packagetype="Optional"; packagelibs="libjni_latinimegoogle.so";;
 
     *)              echo "ERROR! Missing build rule for application with keyword $1"; exit 1;;
   esac
